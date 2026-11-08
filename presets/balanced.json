@@ -1,0 +1,17 @@
+{
+  "id": "balanced",
+  "name": "Balanced / Mid-Range Desktop & Gaming Laptop",
+  "description": "Optimized for dedicated GPUs with 4-6 GB VRAM (GTX 1660, RTX 2060/3050/4050) and 16 GB RAM.",
+  "vmArgs": [
+    "-Xmx5120m",
+    "-XX:MaxDirectMemorySize=2048m",
+    "-Dcom.pzoptimizer.fbo.max=220",
+    "-Dcom.pzoptimizer.fbo.verticalDelta=4"
+  ],
+  "inGameRecommendations": {
+    "texture2x": true,
+    "3DGroundItem": true,
+    "maxVehicleTextureSize": 2,
+    "hordeBatch": "exact (upload: subdata)"
+  }
+}

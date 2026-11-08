@@ -1,0 +1,17 @@
+{
+  "id": "high-end",
+  "name": "High-End Enthusiast Rig",
+  "description": "Optimized for high-performance GPUs with 8 GB+ VRAM (RTX 3070/4070/4080/4090, RX 6800/7800+) and 32 GB+ RAM.",
+  "vmArgs": [
+    "-Xmx6144m",
+    "-XX:MaxDirectMemorySize=3072m",
+    "-Dcom.pzoptimizer.fbo.max=350",
+    "-Dcom.pzoptimizer.fbo.verticalDelta=6"
+  ],
+  "inGameRecommendations": {
+    "texture2x": true,
+    "3DGroundItem": true,
+    "maxVehicleTextureSize": 3,
+    "hordeBatch": "exact (upload: mapped)"
+  }
+}

@@ -1,0 +1,172 @@
+# Engine Tick Optimizer - Interactive Community Installer
+[CmdletBinding()]
+param(
+    [string]$GameDir = "D:\Program Files\Steam\steamapps\common\ProjectZomboid",
+    [string]$Mode,
+    [string]$Preset,
+    [switch]$NonInteractive
+)
+
+$ErrorActionPreference = "Stop"
+
+$scriptDir = $PSScriptRoot
+$projectRoot = Split-Path $scriptDir -Parent
+$presetsDir = Join-Path $projectRoot "presets"
+
+Write-Host "============================================================" -ForegroundColor Cyan
+Write-Host "      PROJECT ZOMBOID: ENGINE TICK OPTIMIZER (ETO)          " -ForegroundColor Cyan
+Write-Host "============================================================" -ForegroundColor Cyan
+
+# 1. Locate and Validate Game Directory
+if (-not (Test-Path $GameDir) -or -not (Test-Path (Join-Path $GameDir "projectzomboid.jar"))) {
+    Write-Host "[!] Default game directory not found at: $GameDir" -ForegroundColor Yellow
+    $GameDir = Read-Host "Please enter the full path to your Project Zomboid directory"
+    if (-not (Test-Path $GameDir) -or -not (Test-Path (Join-Path $GameDir "projectzomboid.jar"))) {
+        Write-Error "Invalid game directory. projectzomboid.jar was not found."
+    }
+}
+$jsonPath = Join-Path $GameDir "ProjectZomboid64.json"
+if (-not (Test-Path $jsonPath)) {
+    Write-Error "ProjectZomboid64.json was not found in: $GameDir"
+}
+
+# 2. Backup ProjectZomboid64.json if not already backed up
+$backupPath = Join-Path $GameDir "ProjectZomboid64.json.eto-backup"
+if (-not (Test-Path $backupPath)) {
+    Copy-Item -Path $jsonPath -Destination $backupPath -Force
+    Write-Host "[+] Backed up original launcher JSON to: ProjectZomboid64.json.eto-backup" -ForegroundColor DarkGray
+}
+
+# 3. Detect PZ_Optimization
+$pzoptDetected = (Test-Path (Join-Path $GameDir "pzopt-installed.txt")) -or (Test-Path (Join-Path $GameDir "media\lua\client\pzopt"))
+Write-Host "`n--- Environment Scan ---" -ForegroundColor Yellow
+Write-Host "Game Location       : $GameDir" -ForegroundColor White
+if ($pzoptDetected) {
+    Write-Host "PZ_Optimization     : DETECTED" -ForegroundColor Green
+} else {
+    Write-Host "PZ_Optimization     : Not detected (Stock / Other Mods)" -ForegroundColor Gray
+}
+
+# 4. Mode Selection
+if (-not $Mode -and -not $NonInteractive) {
+    Write-Host "`n[Step 1 of 2] Select Operating Mode:" -ForegroundColor Yellow
+    Write-Host "  [1] Standalone Full Engine (Recommended for Vanilla / Standard Mods)" -ForegroundColor White
+    Write-Host "      -> Activates all 4 systems: FBO VRAM caching, Zombie distance LOD," -ForegroundColor Gray
+    Write-Host "         Crowd pathfinding rate limiter, and Skyscraper vertical pager." -ForegroundColor Gray
+    Write-Host "  [2] PZ_Optimization Companion Mode $(if ($pzoptDetected) { '(Recommended for your setup)' } else { '' })" -ForegroundColor White
+    Write-Host "      -> Focuses on the Build 42 FBO VRAM manager and skyscraper culling," -ForegroundColor Gray
+    Write-Host "         preserving 100% of pzopt's classes and integrity." -ForegroundColor Gray
+    
+    $defaultModeChoice = if ($pzoptDetected) { "2" } else { "1" }
+    $modeChoice = Read-Host "`nChoose Mode [1-2] (Default: $defaultModeChoice)"
+    if ([string]::IsNullOrWhiteSpace($modeChoice)) { $modeChoice = $defaultModeChoice }
+    $Mode = if ($modeChoice -eq "2") { "companion" } else { "standalone" }
+} elseif (-not $Mode) {
+    $Mode = if ($pzoptDetected) { "companion" } else { "standalone" }
+}
+
+# 5. Preset Selection
+if (-not $Preset -and -not $NonInteractive) {
+    Write-Host "`n[Step 2 of 2] Select Hardware Performance Preset:" -ForegroundColor Yellow
+    Write-Host "  [1] Low-End / APU Laptop (AMD Ryzen Radeon / Intel Iris Xe / 8-16 GB Shared RAM)" -ForegroundColor White
+    Write-Host "      -> Strict FBO cap (160), ground floor immunity, 4096m JVM heap," -ForegroundColor Gray
+    Write-Host "         disables experimental horde batching on APUs." -ForegroundColor Gray
+    Write-Host "  [2] Balanced / Gaming Laptop & Mid Desktop (GTX/RTX discrete GPU 4-6 GB, 16 GB RAM)" -ForegroundColor White
+    Write-Host "      -> Medium FBO pool (220), 4-floor culling, 5120m JVM heap." -ForegroundColor Gray
+    Write-Host "  [3] High-End Rig (RTX 3070/4070+, 8 GB+ Dedicated VRAM, 32 GB RAM)" -ForegroundColor White
+    Write-Host "      -> Large FBO pool (350), relaxed retention, 6144m JVM heap." -ForegroundColor Gray
+
+    $presetChoice = Read-Host "`nChoose Preset [1-3] (Default: 1)"
+    if ([string]::IsNullOrWhiteSpace($presetChoice)) { $presetChoice = "1" }
+    $Preset = switch ($presetChoice) {
+        "2" { "balanced" }
+        "3" { "high-end" }
+        Default { "low-end-apu" }
+    }
+} elseif (-not $Preset) {
+    $Preset = "low-end-apu"
+}
+
+# Load Preset File
+$presetFile = Join-Path $presetsDir "$Preset.json"
+if (-not (Test-Path $presetFile)) {
+    Write-Error "Preset file not found: $presetFile"
+}
+$presetData = Get-Content -Path $presetFile -Raw | ConvertFrom-Json
+
+Write-Host "`n--- Installation Configuration ---" -ForegroundColor Yellow
+Write-Host "Selected Mode       : $Mode" -ForegroundColor White
+Write-Host "Hardware Preset     : $($presetData.name)" -ForegroundColor White
+Write-Host "Preset Description  : $($presetData.description)" -ForegroundColor Gray
+
+# 6. Locate Pre-Built Target JAR
+$sourceJarName = if ($Mode -eq "companion") { "engine-tick-optimizer-companion.jar" } else { "engine-tick-optimizer-standalone.jar" }
+$sourceJarPath = Join-Path $projectRoot "bin\$sourceJarName"
+if (-not (Test-Path $sourceJarPath)) {
+    $sourceJarPath = Join-Path $projectRoot "target\$sourceJarName"
+}
+
+if (-not (Test-Path $sourceJarPath)) {
+    Write-Error "Pre-built binary '$sourceJarName' was not found in the 'bin\' folder.`nPlease make sure the mod archive was extracted completely."
+}
+
+# 7. Copy JAR to Game Root
+$installedJar = Join-Path $GameDir "engine-tick-optimizer.jar"
+Write-Host "Deploying optimizer JAR to game root: $installedJar" -ForegroundColor Green
+Copy-Item -Path $sourceJarPath -Destination $installedJar -Force
+
+# 8. Configure ProjectZomboid64.json
+Write-Host "Updating ProjectZomboid64.json with preset parameters..." -ForegroundColor Green
+$json = Get-Content -Path $jsonPath -Raw | ConvertFrom-Json
+
+# Set Classpath based on Mode
+if ($Mode -eq "companion") {
+    $json.classpath = @(".", "engine-tick-optimizer.jar", "projectzomboid.jar")
+} else {
+    $json.classpath = @("engine-tick-optimizer.jar", ".", "projectzomboid.jar")
+}
+
+# Filter out old flags and apply preset JVM arguments
+$cleanedVmArgs = [System.Collections.ArrayList]@($json.vmArgs | Where-Object {
+    $_ -notlike "-Xmx*" -and
+    $_ -notlike "-XX:MaxDirectMemorySize=*" -and
+    $_ -notlike "-Dcom.pzoptimizer.*" -and
+    $_ -notlike "*-javaagent:*"
+})
+
+foreach ($arg in $presetData.vmArgs) {
+    [void]$cleanedVmArgs.Add($arg)
+}
+$json.vmArgs = $cleanedVmArgs
+
+# Write strictly UTF-8 WITHOUT BOM
+$jsonText = $json | ConvertTo-Json -Depth 10
+$utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+[System.IO.File]::WriteAllText($jsonPath, $jsonText, $utf8NoBom)
+
+# 9. APU Safeguard for PZ_Optimization (Fix black zombies if Low-End APU on pzopt)
+if ($Mode -eq "companion" -and $Preset -eq "low-end-apu") {
+    $pzoptIniPath = Join-Path ([Environment]::GetFolderPath("UserProfile")) "Zomboid\pzopt\options.ini"
+    if (Test-Path $pzoptIniPath) {
+        $pzoptIni = Get-Content -Path $pzoptIniPath
+        $hasHordeBatch = $pzoptIni | Where-Object { $_ -like "hordeBatch=*" }
+        if ($hasHordeBatch) {
+            $pzoptIni = $pzoptIni -replace "hordeBatch=\w+", "hordeBatch=off"
+        } else {
+            $pzoptIni += "hordeBatch=off"
+        }
+        [System.IO.File]::WriteAllLines($pzoptIniPath, $pzoptIni)
+        Write-Host "[+] Safeguard applied: Set hordeBatch=off in pzopt/options.ini to prevent black zombie silhouettes." -ForegroundColor Green
+    }
+}
+
+# 10. Summary and Recommendations Checklist
+Write-Host "`n============================================================" -ForegroundColor Cyan
+Write-Host " [SUCCESS] Engine Tick Optimizer Installed Successfully!     " -ForegroundColor Cyan
+Write-Host "============================================================" -ForegroundColor Cyan
+Write-Host "`nRecommended In-Game Settings for $($presetData.name):" -ForegroundColor White
+Write-Host "  - Texture Quality   : $(if ($presetData.inGameRecommendations.texture2x) { '2x (Double-Sized Textures)' } else { '1x Textures (Recommended for APU / RAM Savings)' })" -ForegroundColor Gray
+Write-Host "  - 3D Ground Items   : $(if ($presetData.inGameRecommendations.'3DGroundItem') { 'Enabled' } else { 'Disabled (Recommended for APU)' })" -ForegroundColor Gray
+Write-Host "  - Vehicle Textures  : $(if ($presetData.inGameRecommendations.maxVehicleTextureSize -eq 1) { 'Medium / 1024' } else { 'High / 2048' })" -ForegroundColor Gray
+
+Write-Host "`nYou can launch Project Zomboid via Steam now.`n" -ForegroundColor Green
