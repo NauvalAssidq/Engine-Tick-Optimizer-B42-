@@ -41,3 +41,11 @@ The project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - **Presets System:** Added JSON templates for `Low-End / APU Laptop`, `Balanced / Mid-Range`, and `High-End Rig`.
 - **Pre-Built Binaries:** Shipped production JARs directly in `bin/`, removing any requirement for players to install JDK or build from source.
 - **1-Click Launchers:** Added `Install.cmd` and `Uninstall.cmd` for double-click execution from Windows File Explorer.
+
+#### Patch 0.1.5: APU Memory Budgeting & Tightened Low-End Profile
+- **Issue:** On AMD Ryzen APUs with unified memory (Ryzen 5 6600H), `ProjectZomboid64.exe` expanded to 7+ GB due to 4 GB heap, 1.5 GB off-heap direct buffers, JVM code caches, and AMD OpenGL driver allocating shared texture VRAM directly inside the process working set. `pzopt.GcChoice` also attempted to expand heap to 50% physical RAM (7,680 MB).
+- **Fix:**
+  - Tightened Low-End APU profile to `-Xmx3072m` (3 GB heap) and `-XX:MaxDirectMemorySize=1024m` (1 GB direct memory), with resident FBO cache capped at 128 (`-Dcom.pzoptimizer.fbo.max=128`).
+  - Automated `gcHeap=3072m` and `chunkGridWidth<=7` in `pzopt/options.ini`, preventing `pzopt` auto-heap expansion and saving ~600 MB of texture VRAM by reducing active chunk grid from 81 to 49 chunks.
+  - Automated `3DGroundItem=false` and `maxVehicleTextureSize=1` in `Zomboid/options.ini` for Low-End APU installations to drastically curb GPU memory pressure in shared RAM.
+  - Enhanced installer classpath preservation to non-destructively preserve existing entries (e.g. `pzopt/aot/pzopt.jar`).

@@ -73,13 +73,13 @@ Select a preset during installation to tune heap size and FBO caching for your h
 | Setting | Low-End / APU Laptop | Balanced / Mid-Range | High-End Rig |
 | :--- | :--- | :--- | :--- |
 | **Target Hardware** | AMD Ryzen Radeon, Intel Iris Xe, 8–16 GB Shared RAM | GTX 1660, RTX 2060/3050/4050 (4–6 GB VRAM), 16 GB RAM | RTX 3070/4070/4080/4090, RX 7800+, 32 GB RAM |
-| **JVM Heap (`-Xmx`)** | `4096m` | `5120m` | `6144m` – `8192m` |
-| **Max Direct Memory** | `1536m` | `2048m` | `3072m` |
-| **Max Active FBOs** | `160` | `220` | `350` |
+| **JVM Heap (`-Xmx`)** | `3072m` | `5120m` | `6144m` – `8192m` |
+| **Max Direct Memory** | `1024m` | `2048m` | `3072m` |
+| **Max Active FBOs** | `128` | `220` | `350` |
 | **Vertical Floor Delta** | `2` floors | `4` floors | `6` floors |
 | **Recommended Textures** | 1x Textures (`texture2x=false`) | 2x Textures (`texture2x=true`) | 2x Textures (`texture2x=true`) |
 | **3D Ground Items** | Disabled | Enabled | Enabled |
-| **PZ_Optimization Batching** | `hordeBatch=off` (prevents unlit silhouette models on APUs) | `hordeBatch=exact` (subdata) | `hordeBatch=exact` (mapped) |
+| **PZ_Optimization Batching** | `hordeBatch=off`, `chunkGridWidth=7` | `hordeBatch=exact` (subdata) | `hordeBatch=exact` (mapped) |
 
 ---
 

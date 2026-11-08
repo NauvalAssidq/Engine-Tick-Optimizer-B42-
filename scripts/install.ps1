@@ -119,19 +119,27 @@ Copy-Item -Path $sourceJarPath -Destination $installedJar -Force
 Write-Host "Updating ProjectZomboid64.json with preset parameters..." -ForegroundColor Green
 $json = Get-Content -Path $jsonPath -Raw | ConvertFrom-Json
 
-# Set Classpath based on Mode
+# Set Classpath preserving existing launcher entries (e.g. pzopt/aot/pzopt.jar)
+$currentCp = [System.Collections.ArrayList]@($json.classpath | Where-Object { $_ -ne "engine-tick-optimizer.jar" })
 if ($Mode -eq "companion") {
-    $json.classpath = @(".", "engine-tick-optimizer.jar", "projectzomboid.jar")
+    $pzJarIndex = $currentCp.IndexOf("projectzomboid.jar")
+    if ($pzJarIndex -ge 0) {
+        $currentCp.Insert($pzJarIndex, "engine-tick-optimizer.jar")
+    } else {
+        [void]$currentCp.Add("engine-tick-optimizer.jar")
+    }
 } else {
-    $json.classpath = @("engine-tick-optimizer.jar", ".", "projectzomboid.jar")
+    $currentCp.Insert(0, "engine-tick-optimizer.jar")
 }
+$json.classpath = $currentCp
 
 # Filter out old flags and apply preset JVM arguments
 $cleanedVmArgs = [System.Collections.ArrayList]@($json.vmArgs | Where-Object {
     $_ -notlike "-Xmx*" -and
     $_ -notlike "-XX:MaxDirectMemorySize=*" -and
     $_ -notlike "-Dcom.pzoptimizer.*" -and
-    $_ -notlike "*-javaagent:*"
+    $_ -notlike "*-javaagent:*" -and
+    $_ -notlike "-Dpzopt.heap=*"
 })
 
 foreach ($arg in $presetData.vmArgs) {
@@ -144,19 +152,50 @@ $jsonText = $json | ConvertTo-Json -Depth 10
 $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
 [System.IO.File]::WriteAllText($jsonPath, $jsonText, $utf8NoBom)
 
-# 9. APU Safeguard for PZ_Optimization (Fix black zombies if Low-End APU on pzopt)
+# 9. APU Safeguard for PZ_Optimization (Fix black zombies & VRAM pressure on APUs)
 if ($Mode -eq "companion" -and $Preset -eq "low-end-apu") {
     $pzoptIniPath = Join-Path ([Environment]::GetFolderPath("UserProfile")) "Zomboid\pzopt\options.ini"
     if (Test-Path $pzoptIniPath) {
-        $pzoptIni = Get-Content -Path $pzoptIniPath
-        $hasHordeBatch = $pzoptIni | Where-Object { $_ -like "hordeBatch=*" }
-        if ($hasHordeBatch) {
-            $pzoptIni = $pzoptIni -replace "hordeBatch=\w+", "hordeBatch=off"
-        } else {
-            $pzoptIni += "hordeBatch=off"
+        $pzoptIni = [System.Collections.ArrayList]@(Get-Content -Path $pzoptIniPath)
+        
+        # hordeBatch=off (fixes black unanimated zombie models on AMD drivers)
+        $hordeIdx = -1
+        for ($i = 0; $i -lt $pzoptIni.Count; $i++) {
+            if ($pzoptIni[$i] -like "hordeBatch=*") { $hordeIdx = $i; break }
         }
+        if ($hordeIdx -ge 0) { $pzoptIni[$hordeIdx] = "hordeBatch=off" } else { [void]$pzoptIni.Add("hordeBatch=off") }
+
+        # gcHeap=3072m (clamps pzopt heap calculator to 3 GB)
+        $gcIdx = -1
+        for ($i = 0; $i -lt $pzoptIni.Count; $i++) {
+            if ($pzoptIni[$i] -like "gcHeap=*") { $gcIdx = $i; break }
+        }
+        if ($gcIdx -ge 0) { $pzoptIni[$gcIdx] = "gcHeap=3072m" } else { [void]$pzoptIni.Add("gcHeap=3072m") }
+
+        # chunkGridWidth=7 (reduces active chunk FBOs from 81 to 49, saving ~600 MB VRAM)
+        $gridIdx = -1
+        for ($i = 0; $i -lt $pzoptIni.Count; $i++) {
+            if ($pzoptIni[$i] -like "chunkGridWidth=*") { $gridIdx = $i; break }
+        }
+        if ($gridIdx -ge 0) {
+            $currentGrid = [int]($pzoptIni[$gridIdx] -replace "chunkGridWidth=", "")
+            if ($currentGrid -gt 7) { $pzoptIni[$gridIdx] = "chunkGridWidth=7" }
+        }
+
         [System.IO.File]::WriteAllLines($pzoptIniPath, $pzoptIni)
-        Write-Host "[+] Safeguard applied: Set hordeBatch=off in pzopt/options.ini to prevent black zombie silhouettes." -ForegroundColor Green
+        Write-Host "[+] Safeguards applied to pzopt/options.ini: hordeBatch=off, gcHeap=3072m, chunkGridWidth<=7." -ForegroundColor Green
+    }
+
+    # Also tune vanilla options.ini for Low-End APU
+    $pzOptionsPath = Join-Path ([Environment]::GetFolderPath("UserProfile")) "Zomboid\options.ini"
+    if (Test-Path $pzOptionsPath) {
+        $pzOptions = [System.Collections.ArrayList]@(Get-Content -Path $pzOptionsPath)
+        for ($i = 0; $i -lt $pzOptions.Count; $i++) {
+            if ($pzOptions[$i] -like "3DGroundItem=*") { $pzOptions[$i] = "3DGroundItem=false" }
+            if ($pzOptions[$i] -like "maxVehicleTextureSize=*") { $pzOptions[$i] = "maxVehicleTextureSize=1" }
+        }
+        [System.IO.File]::WriteAllLines($pzOptionsPath, $pzOptions)
+        Write-Host "[+] Applied APU texture tuning to Zomboid/options.ini: 3DGroundItem=false, maxVehicleTextureSize=1." -ForegroundColor Green
     }
 }
 
@@ -168,5 +207,8 @@ Write-Host "`nRecommended In-Game Settings for $($presetData.name):" -Foreground
 Write-Host "  - Texture Quality   : $(if ($presetData.inGameRecommendations.texture2x) { '2x (Double-Sized Textures)' } else { '1x Textures (Recommended for APU / RAM Savings)' })" -ForegroundColor Gray
 Write-Host "  - 3D Ground Items   : $(if ($presetData.inGameRecommendations.'3DGroundItem') { 'Enabled' } else { 'Disabled (Recommended for APU)' })" -ForegroundColor Gray
 Write-Host "  - Vehicle Textures  : $(if ($presetData.inGameRecommendations.maxVehicleTextureSize -eq 1) { 'Medium / 1024' } else { 'High / 2048' })" -ForegroundColor Gray
+if ($presetData.inGameRecommendations.chunkGridWidth) {
+    Write-Host "  - Chunk Grid Width  : $($presetData.inGameRecommendations.chunkGridWidth)" -ForegroundColor Gray
+}
 
 Write-Host "`nYou can launch Project Zomboid via Steam now.`n" -ForegroundColor Green
