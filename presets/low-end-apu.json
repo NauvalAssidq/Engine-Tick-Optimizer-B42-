@@ -1,18 +1,17 @@
 {
   "id": "low-end-apu",
   "name": "Low-End / APU Laptop",
-  "description": "Optimized for AMD Ryzen APUs, Intel Iris Xe/UHD, and 8-16 GB laptops sharing physical RAM as VRAM.",
+  "description": "Standard vanilla heap (6 GB) with dynamic FBO caching and tick LOD to prevent memory exhaustion and stutter.",
   "vmArgs": [
-    "-Xmx4096m",
-    "-XX:MaxDirectMemorySize=1536m",
+    "-Xms3072m",
+    "-Xmx6144m",
+    "-XX:MaxDirectMemorySize=2048m",
     "-Dcom.pzoptimizer.fbo.max=160",
     "-Dcom.pzoptimizer.fbo.verticalDelta=2"
   ],
   "inGameRecommendations": {
     "texture2x": false,
     "3DGroundItem": false,
-    "maxVehicleTextureSize": 1,
-    "hordeBatch": "off (in PZ_Optimization menu to avoid black models on APUs)",
-    "chunkGridWidth": "7 (in PZ_Optimization menu to save ~600 MB VRAM)"
+    "maxVehicleTextureSize": 1
   }
 }

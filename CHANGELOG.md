@@ -5,6 +5,32 @@ The project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ---
 
+## [0.2.0-alpha] - 2026-11-09
+
+### Project Zomboid Build 42.22 Compatibility & Architecture Overhaul
+
+#### 1. Build 42.22 Signed JAR Security Resolution
+- **Issue:** Project Zomboid Build 42.22 introduced official digital signatures (`META-INF/PROJECTZ.SF`, `META-INF/PROJECTZ.EC`) on `projectzomboid.jar`. Placing loose modified classes on the classpath or overriding classes via un-signed JARs triggered a fatal JVM security violation:
+  `java.lang.SecurityException: class "zombie.characters.IsoGameCharacter"'s signer information does not match signer information of other classes in the same package`
+  followed by `NoClassDefFoundError`, terminating the game immediately on boot.
+- **Resolution:**
+  - Migrated ETO completely to a pure dynamic Java Agent (`-javaagent:engine-tick-optimizer.jar`).
+  - Stripped all `zombie.*` classes from the distribution JAR. The JAR now contains solely `com.pzoptimizer.*` and ASM bytecode transformers.
+  - Game classes are loaded exclusively from `projectzomboid.jar` with digital certificate verification intact. Bytecode transformations are intercepted dynamically in memory via Java's `Instrumentation` API (`PZClassTransformer`), bypassing signer mismatches cleanly and legally.
+  - Classpath is restored to vanilla `[ "projectzomboid.jar" ]`.
+
+#### 2. Discontinuation of PZ_Optimization (pzopt) Companion Mode for 42.22+
+- `PZ_Optimization` stopped updates at Build 42.21 and relied on offline class replacement via the local directory classpath (`.`). This is incompatible with Build 42.22's signed JAR without stripping signatures.
+- ETO now operates as an autonomous, all-in-one standalone agent providing complete FBO VRAM caching, skyscraper culling, distance-based zombie tick LOD, and pathfinding rate-limiting out of the box.
+
+#### 3. Legacy GC Stutter Elimination
+- **Issue:** Residual flags from previous `pzopt` installations injected `-XX:G1NewSizePercent=2` and `-XX:G1MaxNewSizePercent=4` into `ProjectZomboid64.json` under `windows["10.0.17134"]`. This clamped young generation memory to a miniscule 2-4% of heap, triggering constant G1 GC pauses and hitching whenever vehicles moved, doors opened, or containers were accessed.
+- **Resolution:**
+  - Installer purges all legacy `pzopt` arguments (`-Dpzopt.*`, `-XX:PerMethodTrapLimit=0`, etc.) and resets OS-specific VM blocks to vanilla defaults.
+  - Restored Low-End preset heap to standard vanilla sizing: `-Xms3072m`, `-Xmx6144m`, and `-XX:MaxDirectMemorySize=2048m`.
+
+---
+
 ## [0.1.0-alpha] - 2026-11-09
 
 ### Initial Prototype & Core Architecture

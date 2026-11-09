@@ -23,7 +23,7 @@ public final class AgentMain {
     private static void initialize(String agentArgs, Instrumentation inst) {
         instrumentation = inst;
         Log.info("=================================================");
-        Log.info("Engine Tick Optimizer (ETO) v0.1.0-alpha initializing...");
+        Log.info("Engine Tick Optimizer (ETO) v0.2.0-alpha initializing...");
         Log.info("Target: Project Zomboid Build 42 Architecture");
         Log.info("=================================================");
 

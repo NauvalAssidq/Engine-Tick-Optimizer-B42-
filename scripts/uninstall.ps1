@@ -29,16 +29,21 @@ if ($RestoreBackup -and (Test-Path $backupPath)) {
     Copy-Item -Path $backupPath -Destination $jsonPath -Force
     Write-Host "Restored original ProjectZomboid64.json from backup." -ForegroundColor Green
 } elseif (Test-Path $jsonPath) {
-    $jsonContent = Get-Content -Path $jsonPath -Raw | ConvertFrom-Json
-    $jarName = "engine-tick-optimizer.jar"
+    $json = Get-Content -Path $jsonPath -Raw | ConvertFrom-Json
     
-    $filteredCp = @($jsonContent.classpath | Where-Object { $_ -ne $jarName })
-    $jsonContent.classpath = $filteredCp
+    # Clean classpath
+    $json.classpath = @($json.classpath | Where-Object { $_ -ne "engine-tick-optimizer.jar" })
     
-    $jsonFormatted = $jsonContent | ConvertTo-Json -Depth 10
+    # Clean vmArgs
+    $json.vmArgs = @($json.vmArgs | Where-Object {
+        $_ -notlike "*-javaagent:engine-tick-optimizer.jar*" -and
+        $_ -notlike "-Dcom.pzoptimizer.*"
+    })
+    
+    $jsonFormatted = $json | ConvertTo-Json -Depth 10
     $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
     [System.IO.File]::WriteAllText($jsonPath, $jsonFormatted, $utf8NoBom)
-    Write-Host "Cleaned up classpath from ProjectZomboid64.json." -ForegroundColor Green
+    Write-Host "Cleaned up launcher parameters from ProjectZomboid64.json." -ForegroundColor Green
 }
 
 Write-Host "`n[SUCCESS] Engine Tick Optimizer has been cleanly uninstalled." -ForegroundColor Cyan
