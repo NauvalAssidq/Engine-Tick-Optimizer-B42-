@@ -49,3 +49,16 @@ The project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   - Automated `gcHeap=3072m` and `chunkGridWidth<=7` in `pzopt/options.ini`, preventing `pzopt` auto-heap expansion and saving ~600 MB of texture VRAM by reducing active chunk grid from 81 to 49 chunks.
   - Automated `3DGroundItem=false` and `maxVehicleTextureSize=1` in `Zomboid/options.ini` for Low-End APU installations to drastically curb GPU memory pressure in shared RAM.
   - Enhanced installer classpath preservation to non-destructively preserve existing entries (e.g. `pzopt/aot/pzopt.jar`).
+
+#### Patch 0.1.6: Door & Building-Entry Anti-Stutter
+- **Issue:** Opening/closing doors or entering buildings caused momentary frame freezes and camera hitching.
+- **Root Causes:**
+  - `FBOCacheManager.sweepVertical()` was executed via `calculateOnScreen()` across all chunks every frame (~3,000 reflection calls/sec), causing GC churn and freeing upper floors that the cutaway system was actively querying.
+  - `pzopt` was restricted to `workers=1`, serializing ambient lighting recalculations and chunk rebaking onto the main game thread.
+  - `godRaysDoorDustPct=50` and `pixelLight=true` triggered volumetric light shafts and per-pixel indoor lighting passes whenever a doorway portal opened.
+  - `bakeMaxWaitCutaway=3` forced 15–30 building chunk FBOs to rebake synchronously within 3 frames upon building entry.
+- **Fix:**
+  - Cached player elevation once per frame and bitmask-throttled `sweepVertical()` to run once every 64 frames, cutting reflection overhead by 99.9% and preventing cutaway FBO thrashing.
+  - Enabled `workers=4` in `pzopt/options.ini` to offload chunk baking and light propagation to background worker threads.
+  - Set `godRaysDoorDustPct=0` and `pixelLight=false` in `pzopt/options.ini` to eliminate volumetric door shader stalls on integrated APUs.
+  - Relaxed `bakeMaxWaitCutaway=8` to distribute building-entry chunk rebakes smoothly across multiple frames.

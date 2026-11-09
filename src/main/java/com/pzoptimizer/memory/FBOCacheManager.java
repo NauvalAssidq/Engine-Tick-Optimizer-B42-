@@ -42,15 +42,32 @@ public final class FBOCacheManager {
 
     private static Field playersField;
     private static Method getZMethod;
+    private static volatile int cachedPlayerZ = 0;
+    private static volatile boolean playerZCached = false;
 
     public static void onFrameStart() {
         currentFrame++;
+        updateCachedPlayerZ();
         long now = System.currentTimeMillis();
         if (now - lastTelemetryTime > 15000) {
             lastTelemetryTime = now;
             synchronized (activeFBOs) {
                 Log.info("[TELEMETRY] Frame " + currentFrame + " | Resident FBO Textures: " + activeFBOs.size() + "/" + MAX_ACTIVE_FBOS);
             }
+        }
+    }
+
+    private static void updateCachedPlayerZ() {
+        try {
+            initPlayerFields();
+            Object[] players = (Object[]) playersField.get(null);
+            if (players != null && players.length > 0 && players[0] != null) {
+                float pZ = (float) getZMethod.invoke(players[0]);
+                cachedPlayerZ = (int) pZ;
+                playerZCached = true;
+            }
+        } catch (Throwable ignored) {
+            playerZCached = false;
         }
     }
 
@@ -80,13 +97,15 @@ public final class FBOCacheManager {
 
     public static void sweepVertical(Object levels) {
         if (levels == null) return;
+        // Throttle vertical sweep to once every 64 frames to prevent hot-loop reflection and cutaway rebake thrashing
+        if ((currentFrame & 63) != 0) return;
 
         try {
             int minZ = getMinLevel(levels);
             int maxZ = getMaxLevel(levels);
 
             for (int z = minZ; z <= maxZ; z += 2) {
-                // Multi-player / Split-screen guard: only evict if level is far from ALL active players
+                // Multi-player / Split-screen guard: only evict if level is far from active players
                 if (!isLevelNearAnyPlayer(z, MAX_VERTICAL_DELTA)) {
                     freeFBOsForLevel(levels, z);
                 }
@@ -97,6 +116,9 @@ public final class FBOCacheManager {
     }
 
     public static boolean isLevelNearAnyPlayer(int level, int maxDelta) {
+        if (playerZCached) {
+            return Math.abs(level - cachedPlayerZ) <= maxDelta;
+        }
         try {
             initPlayerFields();
             Object[] players = (Object[]) playersField.get(null);

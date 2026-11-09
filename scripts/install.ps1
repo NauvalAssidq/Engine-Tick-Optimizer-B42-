@@ -182,8 +182,37 @@ if ($Mode -eq "companion" -and $Preset -eq "low-end-apu") {
             if ($currentGrid -gt 7) { $pzoptIni[$gridIdx] = "chunkGridWidth=7" }
         }
 
+        # Anti-Stutter Safeguards for Door/Building transitions on APUs:
+        # workers=4 (enables multithreaded lighting and chunk bakes)
+        $workIdx = -1
+        for ($i = 0; $i -lt $pzoptIni.Count; $i++) {
+            if ($pzoptIni[$i] -like "workers=*") { $workIdx = $i; break }
+        }
+        if ($workIdx -ge 0) { $pzoptIni[$workIdx] = "workers=4" } else { [void]$pzoptIni.Add("workers=4") }
+
+        # bakeMaxWaitCutaway=8 (relaxes building-entry cutaway rebaking from 3 frames to 8 frames)
+        $bakeIdx = -1
+        for ($i = 0; $i -lt $pzoptIni.Count; $i++) {
+            if ($pzoptIni[$i] -like "bakeMaxWaitCutaway=*") { $bakeIdx = $i; break }
+        }
+        if ($bakeIdx -ge 0) { $pzoptIni[$bakeIdx] = "bakeMaxWaitCutaway=8" } else { [void]$pzoptIni.Add("bakeMaxWaitCutaway=8") }
+
+        # godRaysDoorDustPct=0 (disables heavy volumetric door dust raymarching shader on door toggle)
+        $dustIdx = -1
+        for ($i = 0; $i -lt $pzoptIni.Count; $i++) {
+            if ($pzoptIni[$i] -like "godRaysDoorDustPct=*") { $dustIdx = $i; break }
+        }
+        if ($dustIdx -ge 0) { $pzoptIni[$dustIdx] = "godRaysDoorDustPct=0" } else { [void]$pzoptIni.Add("godRaysDoorDustPct=0") }
+
+        # pixelLight=false (avoids indoor/outdoor per-pixel light recomputation stalls)
+        $pixIdx = -1
+        for ($i = 0; $i -lt $pzoptIni.Count; $i++) {
+            if ($pzoptIni[$i] -like "pixelLight=*") { $pixIdx = $i; break }
+        }
+        if ($pixIdx -ge 0) { $pzoptIni[$pixIdx] = "pixelLight=false" } else { [void]$pzoptIni.Add("pixelLight=false") }
+
         [System.IO.File]::WriteAllLines($pzoptIniPath, $pzoptIni)
-        Write-Host "[+] Safeguards applied to pzopt/options.ini: hordeBatch=off, gcHeap=3072m, chunkGridWidth<=7." -ForegroundColor Green
+        Write-Host "[+] Safeguards applied to pzopt/options.ini: hordeBatch=off, gcHeap=3072m, workers=4, bakeMaxWaitCutaway=8, godRaysDoorDustPct=0, pixelLight=false." -ForegroundColor Green
     }
 
     # Also tune vanilla options.ini for Low-End APU
