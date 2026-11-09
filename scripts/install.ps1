@@ -165,12 +165,12 @@ if ($Mode -eq "companion" -and $Preset -eq "low-end-apu") {
         }
         if ($hordeIdx -ge 0) { $pzoptIni[$hordeIdx] = "hordeBatch=off" } else { [void]$pzoptIni.Add("hordeBatch=off") }
 
-        # gcHeap=3072m (clamps pzopt heap calculator to 3 GB)
+        # gcHeap=4096m (clamps pzopt heap calculator to 4 GB standard)
         $gcIdx = -1
         for ($i = 0; $i -lt $pzoptIni.Count; $i++) {
             if ($pzoptIni[$i] -like "gcHeap=*") { $gcIdx = $i; break }
         }
-        if ($gcIdx -ge 0) { $pzoptIni[$gcIdx] = "gcHeap=3072m" } else { [void]$pzoptIni.Add("gcHeap=3072m") }
+        if ($gcIdx -ge 0) { $pzoptIni[$gcIdx] = "gcHeap=4096m" } else { [void]$pzoptIni.Add("gcHeap=4096m") }
 
         # chunkGridWidth=7 (reduces active chunk FBOs from 81 to 49, saving ~600 MB VRAM)
         $gridIdx = -1
@@ -212,7 +212,7 @@ if ($Mode -eq "companion" -and $Preset -eq "low-end-apu") {
         if ($pixIdx -ge 0) { $pzoptIni[$pixIdx] = "pixelLight=false" } else { [void]$pzoptIni.Add("pixelLight=false") }
 
         [System.IO.File]::WriteAllLines($pzoptIniPath, $pzoptIni)
-        Write-Host "[+] Safeguards applied to pzopt/options.ini: hordeBatch=off, gcHeap=3072m, workers=4, bakeMaxWaitCutaway=8, godRaysDoorDustPct=0, pixelLight=false." -ForegroundColor Green
+        Write-Host "[+] Safeguards applied to pzopt/options.ini: hordeBatch=off, gcHeap=4096m, workers=4, bakeMaxWaitCutaway=8, godRaysDoorDustPct=0, pixelLight=false." -ForegroundColor Green
     }
 
     # Also tune vanilla options.ini for Low-End APU

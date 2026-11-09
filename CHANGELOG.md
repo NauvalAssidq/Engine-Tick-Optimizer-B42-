@@ -62,3 +62,10 @@ The project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   - Enabled `workers=4` in `pzopt/options.ini` to offload chunk baking and light propagation to background worker threads.
   - Set `godRaysDoorDustPct=0` and `pixelLight=false` in `pzopt/options.ini` to eliminate volumetric door shader stalls on integrated APUs.
   - Relaxed `bakeMaxWaitCutaway=8` to distribute building-entry chunk rebakes smoothly across multiple frames.
+
+#### Patch 0.1.7: Low-End Standard Heap Relaxation
+- **Issue:** Clamping the low-end preset to 3072 MB (`-Xmx3072m`) starved the JVM under heavy modlists (e.g., `A-Life`, `SCKCO`, `MaskaradsSummerCar`, `Neat_Building`), triggering aggressive G1 GC compaction passes and random multi-second freezes.
+- **Fix:**
+  - Restored Low-End preset heap to standard **`4096m` (4 GB)** and DirectMemory to **`1536m`**, with resident FBO cache set to **`160`**.
+  - Updated `pzopt` safeguard to clamp `gcHeap=4096m` in `pzopt/options.ini`.
+  - Provides the G1 Garbage Collector with sufficient slack memory to collect transient objects concurrently in worker threads without stalling the main game loop.

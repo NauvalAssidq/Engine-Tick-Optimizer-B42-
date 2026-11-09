@@ -3,9 +3,9 @@
   "name": "Low-End / APU Laptop",
   "description": "Optimized for AMD Ryzen APUs, Intel Iris Xe/UHD, and 8-16 GB laptops sharing physical RAM as VRAM.",
   "vmArgs": [
-    "-Xmx3072m",
-    "-XX:MaxDirectMemorySize=1024m",
-    "-Dcom.pzoptimizer.fbo.max=128",
+    "-Xmx4096m",
+    "-XX:MaxDirectMemorySize=1536m",
+    "-Dcom.pzoptimizer.fbo.max=160",
     "-Dcom.pzoptimizer.fbo.verticalDelta=2"
   ],
   "inGameRecommendations": {
